@@ -1,0 +1,310 @@
+name: Deployment
+
+on:
+  pull_request:
+    types:
+      - closed
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Tag version to be deployed in PRO'
+        required: false
+
+env:
+  # conditionals envs
+  ACT_IS_DEV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version == '' }}
+  ACT_IS_STG: ${{ github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && github.ref == 'master' }}
+  ACT_IS_PRO: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version != '' }}
+  ACT_HAS_VERSION: ${{ github.event.inputs.version != '' }}
+  # workflow envs
+  APP_NAME: app-name
+  HEALTHCHECKK8S: /health
+  LIVENESSK8S: /health/liveness
+  READINESSK8S: /health/readiness
+  ACCOUNT_ID: '079806680060'
+  SQUAD: css
+
+jobs:
+  calculate_env:
+    runs-on: [self-hosted, cicd]
+    container:
+      image: docker:18.09.9-git
+    steps:
+      # Develop
+      - name: Check branch to deploy dev environment
+        if: env.ACT_IS_DEV == 'true'
+        run: |
+          echo "APP_ENV=dev" >> $GITHUB_ENV
+          echo "export APP_ENV=\"dev\"" >> .env-vars
+      # Staging
+      - name: Check branch master to deploy stg environment
+        if: env.ACT_IS_STG == 'true'
+        run: |
+          echo "APP_ENV=stg" >> $GITHUB_ENV
+          echo "export APP_ENV=\"stg\"" >> .env-vars
+      # Production
+      - name: Check branch master pro environment
+        if: env.ACT_IS_PRO == 'true'
+        run: |
+          echo "APP_ENV=pro" >> $GITHUB_ENV
+          echo "export APP_ENV=\"pro\"" >> .env-vars
+      - name: Upload .env-vars var file
+        uses: actions/upload-artifact@v2
+        with:
+          name: .env-vars
+          path: .env-vars
+          retention-days: 1
+
+  download_ssm_vars:
+    needs: [calculate_env]
+    runs-on: [self-hosted, cicd]
+    container:
+      image: docker:18.09.9-git
+    steps:
+      - name: Checkout APP repository
+        if: env.ACT_HAS_VERSION == 'false'
+        uses: actions/checkout@v2
+      - name: Checkout APP repository with version
+        if: env.ACT_HAS_VERSION == 'true'
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.version }}
+      - name: Download .env-vars artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: .env-vars
+      - name: Source .env-vars
+        run: |
+          source .env-vars
+          echo "APP_ENV=$APP_ENV" >> $GITHUB_ENV
+      - name: AWS assume role SSM globals
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/github-actions
+          aws-region: eu-central-1
+          role-duration-seconds: 3600
+          role-session-name: asume_role_for_ssm
+      - name: Set current package name, version and commit hash
+        run: |
+          echo "export APP_PACKAGE_NAME=$(cat package.json | grep name | head -1 | awk -F: '{ print $2 }' | sed 's/[",]//g' | tr -d '[[:space:]]')" >> .env-globals
+          echo "export APP_VERSION=$(cat package.json | grep version | head -1 | awk -F: '{ print $2 }' | sed 's/[",]//g' | tr -d '[[:space:]]')" >> .env-globals
+          echo "export COMMIT_HASH=$(git rev-parse HEAD)" >> .env-globals
+      - name: Download SSM globals ALL vars
+        uses: deptno/action-aws-ssm-to-dotenv@v1.3.2
+        with:
+          ssm-path: /globals/all/
+          format: shell
+          output: .env-globals
+          decryption: true
+      - name: Download SSM globals ${{ env.APP_ENV }} vars
+        uses: deptno/action-aws-ssm-to-dotenv@v1.3.2
+        with:
+          ssm-path: /globals/${{ env.APP_ENV }}/
+          format: shell
+          output: .env-globals
+          decryption: true
+      - name: Download SSM ${{ env.SQUAD }} ALL vars
+        uses: deptno/action-aws-ssm-to-dotenv@v1.3.2
+        with:
+          ssm-path: /${{ env.SQUAD }}/all/
+          format: shell
+          output: .${{ env.SQUAD }}-globals
+          decryption: true
+      - name: Download SSM ${{ env.SQUAD }} ALL ${{ env.APP_ENV }} vars
+        uses: deptno/action-aws-ssm-to-dotenv@v1.3.2
+        with:
+          ssm-path: /${{ env.SQUAD }}/all/${{ env.APP_ENV }}
+          format: shell
+          output: .${{ env.SQUAD }}-globals-${{ env.APP_ENV }}
+          decryption: true
+      - name: Download SSM ${{ env.APP_ENV }} ${{ env.APP_NAME }} vars
+        uses: deptno/action-aws-ssm-to-dotenv@v1.3.2
+        with:
+          ssm-path: /${{ env.SQUAD }}/${{ env.APP_ENV }}/${{ env.APP_NAME }}/
+          format: shell
+          output: .env-${{ env.APP_NAME }}-${{ env.APP_ENV }}
+          decryption: true
+      - name: Download SSM ${{ env.SQUAD }} ${{ env.APP_ENV }} vars
+        uses: deptno/action-aws-ssm-to-dotenv@v1.3.2
+        with:
+          ssm-path: /${{ env.SQUAD }}/${{ env.APP_ENV }}/
+          format: shell
+          output: .env-${{ env.SQUAD }}-${{ env.APP_ENV }}
+          decryption: true
+      - name: Upload .env-globals var file
+        uses: actions/upload-artifact@v2
+        with:
+          name: .env-globals
+          path: .env-globals
+          retention-days: 1
+      - name: Upload SSM ${{ env.SQUAD }} ALL vars
+        uses: actions/upload-artifact@v2
+        with:
+          name: .${{ env.SQUAD }}-globals
+          path: .${{ env.SQUAD }}-globals
+          retention-days: 1
+      - name: Upload SSM ${{ env.SQUAD }} ALL ${{ env.ENV_APP }} vars
+        uses: actions/upload-artifact@v2
+        with:
+          name: .${{ env.SQUAD }}-globals-${{ env.APP_ENV }}
+          path: .${{ env.SQUAD }}-globals-${{ env.APP_ENV }}
+          retention-days: 1
+      - name: Upload ${{ env.APP_ENV }} ${{ env.APP_NAME }} vars file
+        uses: actions/upload-artifact@v2
+        with:
+          name: .env-${{ env.APP_NAME }}-${{ env.APP_ENV }}
+          path: .env-${{ env.APP_NAME }}-${{ env.APP_ENV }}
+          retention-days: 1
+      - name: Upload ${{ env.SQUAD }} ${{ env.APP_ENV }} vars file
+        uses: actions/upload-artifact@v2
+        with:
+          name: .env-${{ env.SQUAD }}-${{ env.APP_ENV }}
+          path: .env-${{ env.SQUAD }}-${{ env.APP_ENV }}
+          retention-days: 1
+
+  build:
+    needs: [download_ssm_vars]
+    runs-on: [self-hosted, cicd]
+    container:
+      image: wefoxgroup/docker-build-ci
+    steps:
+      - name: Checkout APP repository
+        if: env.ACT_HAS_VERSION == 'false'
+        uses: actions/checkout@v2
+      - name: Checkout APP repository with version
+        if: env.ACT_HAS_VERSION == 'true'
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.version }}
+      - name: Download .env-vars artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: .env-vars
+      - name: Source .env-vars
+        run: |
+          . .env-vars
+          echo "APP_ENV=$APP_ENV" >> $GITHUB_ENV
+      - name: Download .env-globals artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: .env-globals
+          path: devops
+      - name: AWS assume role build and push to ECR
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/github-actions
+          aws-region: eu-central-1
+          role-duration-seconds: 3600
+          role-session-name: asume_role_for_build_and_ecr
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      - name: Create ECR repository (if not exists), build, tag, and push image to it
+        run: |
+          ACT_ENVIRONMENT=""
+
+          if [[ ${ACT_IS_DEV} == "true" ]]; then
+            ACT_ENVIRONMENT="dev"
+          elif [[ ${ACT_IS_STG} == "true" ]]; then
+            ACT_ENVIRONMENT="stg"
+          elif [[ ${ACT_IS_PRO} == "true" ]]; then
+            ACT_ENVIRONMENT="pro"
+          else
+            echo "Unexpected error in build step"
+            exit 1
+          fi
+
+          . devops/.env-globals
+
+          aws ecr describe-repositories --repository-names ${APP_NAME} >> /dev/null 2>&1 || aws ecr create-repository --repository-name ${APP_NAME}
+
+          docker build \
+            -f Dockerfile.build \
+            --build-arg ORG_CORE_NEXUS_NPM_TOKEN=$ORG_CORE_NEXUS_NPM_TOKEN \
+            --build-arg APP_ENVIRONMENT=$ACT_ENVIRONMENT \
+            -t ${REPOSITORY_URL}/${APP_NAME}:${APP_ENV}-${COMMIT_HASH} .
+
+          docker push ${REPOSITORY_URL}/${APP_NAME}:${APP_ENV}-${COMMIT_HASH}
+
+        env:
+          ORG_CORE_NEXUS_NPM_TOKEN: ${{ secrets.ORG_CORE_NEXUS_NPM_TOKEN }}
+
+  deploy:
+    needs: [build]
+    runs-on: [self-hosted, cicd]
+    container:
+      image: wefoxgroup/kubectl-client
+    steps:
+      - name: Checkout APP repository
+        if: env.ACT_HAS_VERSION == 'false'
+        uses: actions/checkout@v2
+      - name: Checkout APP repository with version
+        if: env.ACT_HAS_VERSION == 'true'
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.inputs.version }}
+      - name: Download .env-vars artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: .env-vars
+      - name: Source .env-vars
+        run: |
+          source .env-vars
+          echo "APP_ENV=$APP_ENV" >> $GITHUB_ENV
+      - name: Download .env-globals artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: .env-globals
+          path: devops/kubernetes
+      - name: Download SSM ${{ env.SQUAD }}-globals artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: .${{ env.SQUAD }}-globals
+          path: devops/kubernetes
+      - name: Download SSM ${{ env.SQUAD }} ALL ${{ env.APP_ENV }} artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: .${{ env.SQUAD }}-globals-${{ env.APP_ENV }}
+          path: devops/kubernetes
+      - name: Download .env-${{ env.APP_NAME }}-${{ env.APP_ENV }} artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: .env-${{ env.APP_NAME }}-${{ env.APP_ENV }}
+          path: devops/kubernetes
+      - name: Download .env-${{ env.SQUAD }}-${{ env.APP_ENV }} artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: .env-${{ env.SQUAD }}-${{ env.APP_ENV }}
+          path: devops/kubernetes
+      - name: AWS assume role for deploy to EKS
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/github-actions
+          aws-region: eu-central-1
+          role-duration-seconds: 3600
+          role-session-name: asume_role_for_eks
+      - name: Deploy to EKS
+        working-directory: devops/kubernetes
+        run: |
+          apk add --update gettext
+          source .env-globals
+          source .env-${APP_NAME}-${APP_ENV}
+          source .${SQUAD}-globals
+          source .${SQUAD}-globals-${APP_ENV}
+          aws eks update-kubeconfig --name ${EKS_CLUSTER_NAME}
+          kubectl get namespace ${SQUAD} >> /dev/null 2>&1 || kubectl create namespace ${SQUAD}
+          envsubst < deployment.yml.tmpl | kubectl apply -n ${SQUAD} -f -
+          envsubst < service.yml.tmpl | kubectl apply -n ${SQUAD} -f -
+          envsubst < ingress.yml.tmpl | kubectl apply -n ${SQUAD} -f -
+          kubectl rollout status deployment/${APP_NAME} -n ${SQUAD} --timeout=5m
+
+  cleaning:
+    needs: [calculate_env, download_ssm_vars, build, deploy]
+    if: always()
+    runs-on: [self-hosted, cicd]
+    container:
+      image: docker:18.09.9-git
+    steps:
+      #checkout repos to ensure there is only the info from the repo itself (no tempt files)
+      - name: Checkout APP repository
+        uses: actions/checkout@v2

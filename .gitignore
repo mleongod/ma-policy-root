@@ -1,0 +1,30 @@
+# environment variables
+.env
+.env.*
+!.env.example
+
+# client importmaps
+/client/src/importmaps/local/*.json
+
+# dependencies
+/node_modules
+
+# compile output
+/dist
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# misc
+.DS_Store
+Thumbs.db
+
+# reports
+codeclimate.html
+cloc*.json
+coverage*.json
+e2e/reports/*

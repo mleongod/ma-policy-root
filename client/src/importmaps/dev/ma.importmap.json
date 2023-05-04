@@ -1,0 +1,4 @@
+{
+  "@wefox/ma-session": "https://cdn-web-sandbox.wefox.com/public/pkg/%40wefox/ma-session/latest/dist/main.js",
+  "@wefox/wefox-ma-policy": "http://localhost:8081/main.js"
+}

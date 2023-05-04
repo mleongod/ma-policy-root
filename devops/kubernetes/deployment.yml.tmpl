@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${APP_NAME}
+  labels:
+    app: ${APP_NAME}
+    app.kubernetes.io/name: ${APP_NAME}
+    app.kubernetes.io/version: ${COMMIT_HASH}
+    app.kubernetes.io/managed-by: github
+    app.kubernetes.io/component: pod
+    app.kubernetes.io/part-of: ${APP_NAME}-svc
+  annotations:
+    app: ${APP_NAME}
+    env: ${APP_ENV}
+spec:
+  replicas: ${DEPLOYMENT_REPLICAS}
+  revisionHistoryLimit: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: ${DEPLOYMENT_REPLICAS}
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: ${APP_NAME}
+  template:
+    metadata:
+      labels:
+        app: ${APP_NAME}
+    spec:
+      containers:
+        - name: ${APP_NAME}
+          image: ${REPOSITORY_URL}/${APP_NAME}:${APP_ENV}-${COMMIT_HASH}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: ${LIVENESSK8S}
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: ${READINESSK8S}
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            successThreshold: 1
+          env:
+            - name: APP_BUILD
+              value: '${COMMIT_HASH}'
+            - name: APP_PACKAGE_NAME
+              value: '${APP_PACKAGE_NAME}'
+            - name: APP_VERSION
+              value: '${APP_VERSION}'

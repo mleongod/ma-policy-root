@@ -1,0 +1,6 @@
+{
+  "@wefox/analytics": "https://cdn-web.wefox.com/public/pkg/%40wefox/analytics/3.5.0/main.js",
+  "@wefox/http": "https://cdn-web.wefox.com/public/pkg/%40wefox/http/3.5.0/main.js",
+  "@wefox/i18n": "https://cdn-web.wefox.com/public/pkg/%40wefox/i18n/3.5.0/main.js",
+  "@wefox/root-config": "/root-config.js"
+}

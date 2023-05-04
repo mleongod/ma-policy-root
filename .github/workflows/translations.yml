@@ -1,0 +1,71 @@
+name: Translations
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment: dev | stg | pro'
+        required: true
+
+env:
+  # workflow envs
+  ACT_APP_NAME: boilerplate
+  ACT_NODE_VERSION: 12.x
+  ACT_AWS_REGION: eu-central-1
+  ACT_AWS_S3_UPLOAD_PATH: ./tmp-translations/
+  ACT_LOKALISE_PROJECT_ID: 765914045f081de457d575.59348566
+  ACT_TARGET_ENVIRONMENT: ${{ github.event.inputs.environment }}
+  # updated in "configure pipeline" step
+  ACT_AWS_KEY_ID: ''
+  ACT_AWS_KEY_SECRET: ''
+  ACT_AWS_S3_BUCKET: ''
+  ACT_AWS_S3_DESTINATION_PATH: ''
+
+jobs:
+  deploy-translations:
+    runs-on: [self-hosted, vmslave]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Checkout core actions
+        uses: actions/checkout@v2
+        with:
+          repository: uberforcede/wg-core-gh-actions
+          path: ./.github/core-actions
+          token: ${{ secrets.ORG_CORE_GITHUB_PAT }}
+      - name: Configure pipeline
+        run: |
+          if [[ ${ACT_TARGET_ENVIRONMENT} == "dev" || ${ACT_TARGET_ENVIRONMENT} == "stg" ]]; then
+            ACT_AWS_KEY_ID=${{ secrets.ORG_CORE_AWS_WEB_CDN_SANDBOX_KEY_ID }}
+            ACT_AWS_KEY_SECRET=${{ secrets.ORG_CORE_AWS_WEB_CDN_SANDBOX_KEY_SECRET }}
+            ACT_AWS_S3_BUCKET="cdn-web-sandbox.wefox.com"
+            ACT_AWS_S3_DESTINATION_PATH=public/locales/${ACT_APP_NAME}/${ACT_TARGET_ENVIRONMENT}
+          elif [[ ${ACT_TARGET_ENVIRONMENT} == "pro" ]]; then
+            ACT_AWS_KEY_ID=${{ secrets.ORG_CORE_AWS_WEB_CDN_PRO_KEY_ID }}
+            ACT_AWS_KEY_SECRET=${{ secrets.ORG_CORE_AWS_WEB_CDN_PRO_KEY_SECRET }}
+            ACT_AWS_S3_BUCKET="cdn-web.wefox.com"
+            ACT_AWS_S3_DESTINATION_PATH=public/locales/${ACT_APP_NAME}
+          else
+            echo "Unexpected error in configuration pipeline step"
+            exit 1
+          fi
+
+          echo "ACT_AWS_KEY_ID=${ACT_AWS_KEY_ID}" >> ${GITHUB_ENV}
+          echo "ACT_AWS_KEY_SECRET=${ACT_AWS_KEY_SECRET}" >> ${GITHUB_ENV}
+          echo "ACT_AWS_S3_BUCKET=${ACT_AWS_S3_BUCKET}" >> ${GITHUB_ENV}
+          echo "ACT_AWS_S3_DESTINATION_PATH=${ACT_AWS_S3_DESTINATION_PATH}" >> ${GITHUB_ENV}
+      - name: Download translations bundle
+        uses: ./.github/core-actions/lokalise-cli/v1
+        with:
+          apiKey: ${{ secrets.ORG_CORE_LOKALISE_TOKEN }}
+          projectId: ${{ env.ACT_LOKALISE_PROJECT_ID }}
+          options: --format json --replace-breaks=false --placeholder-format printf --export-sort a_z --original-filenames=false --bundle-structure %LANG_ISO%.%FORMAT% --unzip-to ${{ env.ACT_AWS_S3_UPLOAD_PATH }}
+      - name: Upload to AWS S3
+        uses: ./.github/core-actions/upload-artifacts/v2
+        with:
+          source_paths: ${{ env.ACT_AWS_S3_UPLOAD_PATH }}
+          destination_path: ${{ env.ACT_AWS_S3_DESTINATION_PATH }}
+          aws_access_key_id: ${{ env.ACT_AWS_KEY_ID }}
+          aws_secret_access_key: ${{ env.ACT_AWS_KEY_SECRET }}
+          aws_bucket: ${{ env.ACT_AWS_S3_BUCKET }}
+          aws_region: ${{ env.ACT_AWS_REGION }}

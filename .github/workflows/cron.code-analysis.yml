@@ -1,0 +1,116 @@
+name: cron.code-analysis
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+env:
+  PROJECT: 'wefox-web-customer-root'
+
+jobs:
+  codeclimate:
+    runs-on: [self-hosted, vmslave]
+    timeout-minutes: 60
+    steps:
+      # Checkout
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Git submodules
+        uses: actions/checkout@v2
+        with:
+          repository: uberforcede/wg-core-gh-actions
+          ref: 'master'
+          path: .github/core-actions
+          fetch-depth: 20
+          token: ${{ secrets.ORG_CORE_GITHUB_PAT }}
+      # Configure
+      - name: Configure private vars
+        uses: ./.github/core-actions/configure/v1
+      # Code analysis
+      - name: Code Climate HTML
+        run: |
+          docker run \
+          --rm \
+          --env CODECLIMATE_CODE="$PWD" \
+          --volume "$PWD":/code \
+          --volume /var/run/docker.sock:/var/run/docker.sock \
+          --volume /tmp/cc:/tmp/cc \
+          codeclimate/codeclimate analyze -f html > codeclimate.html
+      - name: Code Climate JSON
+        run: |
+          docker run \
+          --rm \
+          --env CODECLIMATE_CODE="$PWD" \
+          --volume "$PWD":/code \
+          --volume /var/run/docker.sock:/var/run/docker.sock \
+          --volume /tmp/cc:/tmp/cc \
+          codeclimate/codeclimate analyze -f json > codeclimate.json
+      - name: Upload report
+        if: ${{ success() }}
+        uses: ./.github/core-actions/upload-artifacts/v2
+        with:
+          source_paths: |
+            codeclimate.*
+          destination_path: ${{ env.APP_REPO }}/nightly/analysis
+          aws_access_key_id: ${{ secrets.ORG_CORE_AWS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.ORG_CORE_AWS_KEY_SECRET }}
+          aws_bucket: wg-core-document-center-reports
+      - name: Clear files
+        if: ${{ always() }}
+        run: rm -rf *
+  send-stats:
+    runs-on: [self-hosted, vmslave]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Git submodules
+        uses: actions/checkout@v2
+        with:
+          repository: uberforcede/wg-core-gh-actions
+          ref: 'master'
+          path: .github/core-actions
+          fetch-depth: 20
+          token: ${{ secrets.ORG_CORE_GITHUB_PAT }}
+      # Configure
+      - name: Configure private vars
+        uses: ./.github/core-actions/configure/v1
+      # Code analysis
+      - name: Code coverage
+        run: echo "Running some unit testing reports"
+      - name: Cloc
+        run: |
+          docker run --rm -v $PWD:/tmp aldanial/cloc client server --json > cloc.json
+      - name: Parse cloc
+        run: |
+          docker run --rm -v $PWD:/data imega/jq -c ". | {files: .SUM.nFiles, code: .SUM.code, blank: .SUM.blank, comment: .SUM.comment, lines: [.SUM.code,.SUM.comment,.SUM.blank] | add }" /data/cloc.json > cloc_parsed.json
+      - name: from json to step
+        id: json
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: ./cloc_parsed.json
+      - name: Upload report
+        if: ${{ success() }}
+        uses: ./.github/core-actions/upload-artifacts/v2
+        with:
+          source_paths: |
+            cloc*.json
+          destination_path: ${{ env.APP_REPO }}/nightly/analysis
+          aws_access_key_id: ${{ secrets.ORG_CORE_AWS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.ORG_CORE_AWS_KEY_SECRET }}
+          aws_bucket: wg-core-document-center-reports
+      - id: customer-send-stats
+        name: Send Stats
+        uses: ./.github/core-actions/send-stats/v2/
+        with:
+          measurement: code_analysis
+          project: ${{ env.PROJECT }}
+          module: ${{ env.APP_REPO }}
+          stats: |
+            files:${{fromJson(steps.json.outputs.content).files}}
+            lines:${{fromJson(steps.json.outputs.content).lines}}
+            code:${{fromJson(steps.json.outputs.content).code}}
+            comment:${{fromJson(steps.json.outputs.content).comment}}
+            blank:${{fromJson(steps.json.outputs.content).blank}}
+            coverage:0
+      - name: Clear files
+        if: ${{ always() }}
+        run: rm -rf *

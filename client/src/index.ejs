@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      content="Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s"
+      name="description"
+    />
+    <title>Boilerplate - wefox</title>
+
+    <link rel="icon" type="image/x-icon" href="/assets/favicons/favicon.ico" />
+    <link
+      rel="stylesheet"
+      href="https://cdn-web.wefox.com/public/pkg/%40wefox/ui-components/<%= htmlWebpackPlugin.options.params.uiComponentsVersion %>/dist/wefox-ui-components/wefox-ui-components.css"
+    />
+    <script
+      type="module"
+      src="https://cdn-web.wefox.com/public/pkg/@wefox/ui-components/<%= htmlWebpackPlugin.options.params.uiComponentsVersion %>/dist/wefox-ui-components/wefox-ui-components.esm.js"
+    ></script>
+    <script
+      nomodule
+      src="https://cdn-web.wefox.com/public/pkg/@wefox/ui-components/<%= htmlWebpackPlugin.options.params.uiComponentsVersion %>/dist/wefox-ui-components/wefox-ui-components.js"
+    ></script>
+    <script>
+      (function (w, d, s, l, i) {
+        w[l] = w[l] || [];
+        w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+        var f = d.getElementsByTagName(s)[0],
+          j = d.createElement(s),
+          dl = l != 'dataLayer' ? '&l=' + l : '';
+        j.async = true;
+        j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+        f.parentNode.insertBefore(j, f);
+      })(window, document, 'script', 'dataLayer', '<%= htmlWebpackPlugin.options.params.gtmKey %>');
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/zone.js@0.11.8/dist/zone.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/systemjs/dist/system.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/systemjs/dist/extras/amd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/systemjs/dist/extras/named-register.min.js"></script>
+    <script type="systemjs-importmap">
+      <%= htmlWebpackPlugin.options.params.importmaps %>
+    </script>
+    <% if (htmlWebpackPlugin.options.params.isDevelopment) { %>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/import-map-overrides/dist/import-map-overrides.js"></script>
+    <% } %>
+    <script type="text/javascript">
+      window.wefoxConfig = <%= htmlWebpackPlugin.options.params.publicConfig %>
+    </script>
+
+    <template id="single-spa-layout">
+      <single-spa-router>
+        <div class="h-100 d-flex flex-column bg-neutral-lightest overflow-auto">
+        <route path="/">
+          <application name="@wefox/ma-policy"></application>
+        </route>
+        <route default>
+          <div class="align-items-center d-flex h-100 justify-content-center w-100">Default route</div>
+        </route>
+      </div>
+      </single-spa-router>
+    </template>
+
+  </head>
+  <body>
+    <noscript
+      ><iframe
+        height="0"
+        src="https://www.googletagmanager.com/ns.html?id=<%= htmlWebpackPlugin.options.params.gtmKey %>"
+        style="display: none; visibility: hidden"
+        width="0"
+      ></iframe
+    ></noscript>
+    <script>
+      System.import('@wefox/root-config');
+    </script>
+  </body>
+</html>
+

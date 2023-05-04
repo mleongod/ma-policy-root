@@ -1,0 +1,72 @@
+{
+  "name": "@wefox/root-boilerplate",
+  "version": "0.0.0",
+  "description": "",
+  "private": true,
+  "main": "dist/index.js",
+  "homepage": "https://github.com/uberforcede/wefox-web-root-boilerplate#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uberforcede/wefox-web-root-boilerplate.git"
+  },
+  
+  "scripts": {
+    "start": "npm run start:client:local",
+    "start:client:local": "webpack serve --mode=development --env environment=local",
+    "start:client:dev": "webpack serve --mode=development --env environment=dev",
+    "start:client:stg": "webpack serve --mode=development --env environment=stg",
+    "start:client:pro": "webpack serve --mode=development --env environment=pro",
+    "start:server:dev": "NODE_ENV=development nodemon -r dotenv/config server/src/index.ts",
+    "start:server:pro": "NODE_ENV=production node dist/index.js",
+    "build": "npm run build:clean && npm run build:server && npm run build:client:pro",
+    "build:clean": "rm -rf dist/",
+    "build:client:local": "webpack --mode=production --env environment=local",
+    "build:client:dev": "webpack --mode=production --env environment=dev",
+    "build:client:stg": "webpack --mode=production --env environment=stg",
+    "build:client:pro": "webpack --mode=production --env environment=pro",
+    "build:server": "tsc --project ./tsconfig.build.json",
+    "bump": "npm version --no-git-tag-version",
+    "lint": "eslint .",
+    "format:check": "prettier --check client/src/ server/src/",
+    "format:write": "prettier --write client/src/ server/src/"
+  },
+  "lint-staged": {
+    "*": "npm run format:check",
+    "*.{js,jsx,ts,tsx}": "eslint"
+  },
+  "dependencies": {
+    "express": "4.18.1",
+    "helmet": "6.0.0",
+    "morgan": "1.10.0",
+    "npm-check-updates": "^16.0.6",
+    "single-spa": "5.9.4",
+    "single-spa-layout": "2.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "4.17.13",
+    "@types/morgan": "1.9.3",
+    "@types/node": "18.7.14",
+    "@types/systemjs": "6.1.1",
+    "@typescript-eslint/eslint-plugin": "5.36.0",
+    "@typescript-eslint/parser": "5.36.0",
+    "copy-webpack-plugin": "11.0.0",
+    "dotenv": "16.0.1",
+    "eslint": "8.23.0",
+    "eslint-config-airbnb-base": "15.0.0",
+    "eslint-config-prettier": "8.5.0",
+    "eslint-plugin-import": "2.26.0",
+    "eslint-plugin-prettier": "4.2.1",
+    "html-webpack-plugin": "5.5.0",
+    "husky": "^8.0.0",
+    "lint-staged": "13.0.3",
+    "nodemon": "2.0.19",
+    "prettier": "2.7.1",
+    "ts-loader": "9.3.1",
+    "ts-node": "10.9.1",
+    "typescript": "4.8.2",
+    "webpack": "5.74.0",
+    "webpack-cli": "4.10.0",
+    "webpack-dev-server": "4.10.1",
+    "webpack-merge": "5.8.0"
+  }
+}

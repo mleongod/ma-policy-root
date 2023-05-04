@@ -1,0 +1,9 @@
+{
+  "@wefox/analytics": "//localhost:2004/main.js",
+  "@wefox/auth": "//localhost:2001/main.js",
+  "@wefox/events": "//localhost:2006/main.js",
+  "@wefox/i18n": "//localhost:2003/main.js",
+  "@wefox/persistance": "//localhost:2005/main.js",
+  "@wefox/root-config": "/root-config.js",
+  "@wefox/tweak": "//localhost:2007/main.js"
+}

@@ -1,0 +1,13 @@
+{
+  "@wefox/ma-claims": "//localhost:3009/main.js",
+  "@wefox/ma-contact-support": "//localhost:3008/main.js",
+  "@wefox/ma-contracts": "//localhost:3007/main.js",
+  "@wefox/ma-footer": "//localhost:3010/main.js",
+  "@wefox/ma-navigation": "//localhost:3001/main.js",
+  "@wefox/ma-notifier": "//localhost:3011/main.js"
+  "@wefox/ma-profile": "//localhost:3006/main.js",
+  "@wefox/ma-registration": "//localhost:3012/main.js",
+  "@wefox/ma-session": "//localhost:3003/main.js",
+  "@wefox/ma-update-payment": "//localhost:4011/main.js",
+  "@wefox/wefox-ma-policy": "http://localhost:8081/main.js"
+}

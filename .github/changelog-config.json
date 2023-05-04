@@ -1,0 +1,33 @@
+{
+  "changelog_type": "pull_request",
+  "header_prefix": "",
+  "commit_changelog": true,
+  "comment_changelog": true,
+  "pull_request_title_regex": "(Release)(.*)",
+  "group_config": [
+    {
+      "title": "Bug fixes",
+      "labels": ["bug"]
+    },
+    {
+      "title": "Code improvements",
+      "labels": ["refactor", "spike"]
+    },
+    {
+      "title": "Devops, CI/CD features",
+      "labels": ["ci", "devops"]
+    },
+    {
+      "title": "Documentation updates",
+      "labels": ["documentation"]
+    },
+    {
+      "title": "New features",
+      "labels": ["feature"]
+    },
+    {
+      "title": "Tests improvements",
+      "labels": ["test"]
+    }
+  ]
+}
